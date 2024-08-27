@@ -69,11 +69,11 @@ fun RegisterScreen(navController: NavHostController) {
                                             }
                                         }
                                         .addOnFailureListener { e ->
-                                            errorMessage = e.message ?: "Unknown error"
+                                            errorMessage = "Failed to save user data: ${e.message}"
                                         }
                                 }
                             } else {
-                                errorMessage = task.exception?.message ?: "Unknown error"
+                                errorMessage = "Registration failed: ${task.exception?.message}"
                             }
                         }
                 } else {
@@ -88,7 +88,7 @@ fun RegisterScreen(navController: NavHostController) {
             Text("Already have an account? Login")
         }
         if (errorMessage.isNotEmpty()) {
-            Text(errorMessage, color = Color.Red)
+            Text(errorMessage, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }

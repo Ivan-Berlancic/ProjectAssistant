@@ -42,20 +42,24 @@ fun LoginScreen(navController: NavHostController, currentUser: MutableState<Fire
         )
         Button(
             onClick = {
-                auth.signInWithEmailAndPassword(email, password)
-                    .addOnCompleteListener { task ->
-                        if (task.isSuccessful) {
-                            val user = auth.currentUser
-                            currentUser.value = user
-                            user?.let {
-                                navController.navigate("main") {
-                                    popUpTo("login") { inclusive = true }
+                if (email.isNotEmpty() && password.isNotEmpty()) {
+                    auth.signInWithEmailAndPassword(email, password)
+                        .addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                val user = auth.currentUser
+                                currentUser.value = user
+                                user?.let {
+                                    navController.navigate("main") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
                                 }
+                            } else {
+                                errorMessage = task.exception?.message ?: "Login failed"
                             }
-                        } else {
-                            errorMessage = task.exception?.message ?: "Unknown error"
                         }
-                    }
+                } else {
+                    errorMessage = "Please enter both email and password"
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -65,7 +69,7 @@ fun LoginScreen(navController: NavHostController, currentUser: MutableState<Fire
             Text("Don't have an account? Register")
         }
         if (errorMessage.isNotEmpty()) {
-            Text(errorMessage, color = Color.Red)
+            Text(errorMessage, color = Color.Red, modifier = Modifier.padding(top = 8.dp))
         }
     }
 }

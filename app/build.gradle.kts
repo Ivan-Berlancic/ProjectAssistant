@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.projectassistent2"
-        minSdk = 24
+        minSdk = 25
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -65,6 +65,10 @@ dependencies {
     implementation(libs.firebase.common.ktx)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth.ktx)
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.storage.ktx)
+    implementation("io.coil-kt:coil-compose:2.4.0")
+    implementation(libs.androidx.compose.material)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

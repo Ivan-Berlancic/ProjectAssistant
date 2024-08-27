@@ -1,47 +1,55 @@
-package com.example.projectassistent2
-
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZbukanjeScreen(onBackClick: () -> Unit) {
+    val firestore = remember { FirebaseFirestore.getInstance() }
+    val auth = remember { FirebaseAuth.getInstance() }
+    val currentUser = auth.currentUser
+    val userMaterials = remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    val materialCalculation = remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    val materialCosts = remember { mutableStateOf<Map<String, Double>>(emptyMap()) }
+
     var area by remember { mutableStateOf("") }
     var selectedOption by remember { mutableStateOf("Grubo žbukanje") }
-    var materialCalculation by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+
+    LaunchedEffect(currentUser) {
+        currentUser?.let { user ->
+            firestore.collection("Materijali")
+                .document(user.uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    val materials = document.data?.mapValues { (key, value) ->
+                        (value as Long).toInt()
+                    } ?: emptyMap()
+                    userMaterials.value = materials
+                }
+        }
+    }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Žbukanje") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        },
+
         content = { paddingValues ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color(0xFF2E2E2E))
                     .padding(paddingValues)
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -101,51 +109,57 @@ fun ZbukanjeScreen(onBackClick: () -> Unit) {
 
                 Button(
                     onClick = {
-                        // Perform calculation based on the entered area and selected option
                         val areaValue = area.toDoubleOrNull() ?: 0.0
-                        materialCalculation = calculateMaterials(areaValue, selectedOption)
+                        materialCalculation.value = calculateMaterials(areaValue, selectedOption)
+                        materialCosts.value = calculateCost(materialCalculation.value, userMaterials.value)
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Izračunaj količinu materijala")
                 }
 
-                if (materialCalculation.isNotEmpty()) {
+                if (materialCalculation.value.isNotEmpty()) {
                     Text(
                         text = "Rezultati izračuna:",
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.White
                     )
-                    materialCalculation.forEach { (key, value) ->
-                        Text(
-                            text = "$key: $value",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.White
-                        )
+
+                    materialCalculation.value.forEach { (material, requiredQty) ->
+                        val userQty = userMaterials.value[material] ?: 0
+                        val neededQty = maxOf(0, requiredQty - userQty)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "$material: $requiredQty kg",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Nedostaje: $neededQty kg",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (neededQty == 0) Color.Green else Color.Red
+                            )
+                        }
                     }
-                    // Approximate cost section
+
                     Text(
                         text = "Aproksimacija troškova:",
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.White
                     )
+                    materialCosts.value.forEach { (material, cost) ->
+                        Text(
+                            text = "$material: ${cost}€",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White
+                        )
+                    }
                     Text(
-                        text = "Pijesak: 0€",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Cement: 0€",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Vapno: 0€",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.White
-                    )
-                    Text(
-                        text = "Ukupno: 0€",
+                        text = "Ukupno: ${materialCosts.value.values.sum()}€",
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.White
                     )
@@ -160,16 +174,9 @@ fun ZbukanjeScreen(onBackClick: () -> Unit) {
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_user_profile),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                    )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "Korisnik: Ivan Berlančić",
+                        text = "Korisnik: ${currentUser?.email ?: "Gost"}",
                         color = Color.White,
                         style = MaterialTheme.typography.bodyLarge
                     )
@@ -179,19 +186,37 @@ fun ZbukanjeScreen(onBackClick: () -> Unit) {
     )
 }
 
-private fun calculateMaterials(area: Double, type: String): Map<String, String> {
+private fun calculateMaterials(area: Double, type: String): Map<String, Int> {
     return when (type) {
         "Grubo žbukanje" -> mapOf(
-            "Pijesak" to "${(area * 2).toInt()} kg",
-            "Cement" to "${(area * 1).toInt()} kg",
-            "Vapno" to "${(area * 1).toInt()} kg"
+            "Pijesak" to (area * 2).toInt(),
+            "Cement" to (area * 1).toInt(),
+            "Vapno" to (area * 1).toInt()
         )
         "Fino žbukanje" -> mapOf(
-            "Pijesak" to "${(area * 1.5).toInt()} kg",
-            "Cement" to "${(area * 0.5).toInt()} kg",
-            "Vapno" to "${(area * 0.5).toInt()} kg"
+            "Pijesak" to (area * 1.5).toInt(),
+            "Cement" to (area * 0.5).toInt(),
+            "Vapno" to (area * 0.5).toInt()
         )
         else -> emptyMap()
     }
 }
 
+private fun calculateCost(
+    materialCalculation: Map<String, Int>,
+    userMaterials: Map<String, Int>
+): Map<String, Double> {
+
+    val prices = mapOf(
+        "Pijesak" to 0.1,
+        "Cement" to 0.2,
+        "Vapno" to 0.15
+    )
+
+    return materialCalculation.map { (material, requiredQty) ->
+        val userQty = userMaterials[material] ?: 0
+        val neededQty = maxOf(0, requiredQty - userQty)
+        val cost = (prices[material] ?: 0.0) * neededQty
+        material to cost
+    }.toMap()
+}
